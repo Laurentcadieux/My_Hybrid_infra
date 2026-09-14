@@ -2,6 +2,8 @@
 *.tfstate
 *.tfstate.*
 secrets.*.tfvars
+secrets.tfvars
+*secrets*.tfvars
 *.auto.tfvars
 *.auto.tfvars.json
 .terraform/

@@ -2,18 +2,16 @@ project_name    = "hybrid-infra"
 environment     = "dev"
 region          = "nyc1"
 
-# SSH — paste your public key here
-# Run: cat keys/hybrid-infra-admin.pub
-ssh_public_key  = "PASTE_YOUR_PUBLIC_KEY_HERE"
+# SSH
+ssh_public_key  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEZkbH2GXoq4hH4PvGbRRcjRe3a/0Gm8AiNM4Ax1cAD5 hybrid-infra-admin"
 
 # DigitalOcean edge (light — Nginx reverse proxy only)
 do_droplet_size = "s-1vcpu-1gb"
 
-# VPN (DO ↔ Proxmox)
-vpn_preshared_key = "CHANGE_ME_GENERATE_A_REAL_KEY"
-vpn_subnet        = "10.99.0.0/24"
-do_vpn_ip         = "10.99.0.1"
-pm_vpn_ip         = "10.99.0.2"
+# VPN (DO ↔ Proxmox) — non-secret config
+vpn_subnet      = "10.99.0.0/24"
+do_vpn_ip       = "10.99.0.1"
+pm_vpn_ip       = "10.99.0.2"
 
 # Proxmox dual-node HA/DR
 pm_node_name   = "hyper100"
