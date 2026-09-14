@@ -13,9 +13,6 @@ terraform {
   }
 
   backend "azurerm" {
-    # Values come from environment variables:
-    # ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_SUBSCRIPTION_ID, ARM_TENANT_ID
-    # ARM_RESOURCE_GROUP, ARM_STORAGE_ACCOUNT, ARM_CONTAINER_NAME
     resource_group_name  = "rg-terraform-state"
     storage_account_name = "stterraformstate"
     container_name       = "tfstate"
@@ -24,14 +21,13 @@ terraform {
 }
 
 provider "digitalocean" {
-  # Token from environment: DO_TOKEN
   token = var.do_token
 }
 
 provider "proxmox" {
-  endpoint = var.pm_endpoint
-  api_token = var.pm_api_token
-  insecure = var.pm_insecure # set to false in production with valid certs
+  endpoint   = var.pm_endpoint
+  api_token  = var.pm_api_token
+  insecure   = var.pm_insecure
   ssh {
     agent = true
   }

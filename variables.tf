@@ -1,146 +1,199 @@
 ###################
-# General Variables
+# General
 ###################
 
 variable "project_name" {
   type        = string
-  description = "Project name used for naming resources"
+  description = "Project name for resource naming"
   default     = "hybrid-infra"
 }
 
 variable "environment" {
   type        = string
-  description = "Environment name (dev, staging, prod)"
+  description = "Environment (dev, staging, prod)"
   default     = "dev"
-
   validation {
     condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be one of: dev, staging, prod."
+    error_message = "Must be dev, staging, or prod."
   }
 }
 
 variable "region" {
   type        = string
-  description = "DigitalOcean region for cloud resources"
+  description = "DigitalOcean region"
   default     = "nyc1"
 }
 
 ###################
-# SSH Keys
+# SSH
 ###################
 
 variable "ssh_public_key" {
-  type        = string
-  description = "Public SSH key for VM access"
-  sensitive   = true
+  type      = string
+  sensitive = true
 }
 
 variable "ssh_private_key_path" {
-  type        = string
-  description = "Path to private SSH key for Proxmox VM provisioning"
-  default     = "keys/hybrid-infra-admin"
+  type    = string
+  default = "keys/hybrid-infra-admin"
 }
 
 ###################
-# DigitalOcean
+# DigitalOcean (Light Edge / DMZ)
 ###################
 
 variable "do_token" {
-  type        = string
-  description = "DigitalOcean Personal Access Token"
-  sensitive   = true
+  type      = string
+  sensitive = true
 }
 
 variable "do_droplet_size" {
-  type        = string
-  description = "Droplet size for web app servers"
-  default     = "s-2vcpu-4gb"
-}
-
-variable "do_droplet_count" {
-  type        = number
-  description = "Number of web app droplets"
-  default     = 2
-}
-
-variable "do_db_engine" {
-  type        = string
-  description = "Database engine (pg or mysql)"
-  default     = "pg"
-}
-
-variable "do_db_size" {
-  type        = string
-  description = "Managed database size"
-  default     = "db-s-1vcpu-1gb"
-}
-
-variable "do_db_node_count" {
-  type        = number
-  description = "Number of database nodes (1 for dev, 2+ for HA)"
-  default     = 1
+  type    = string
+  default = "s-1vcpu-1gb"
 }
 
 ###################
-# Proxmox (On-Prem)
+# VPN (DO ↔ Proxmox)
+###################
+
+variable "vpn_preshared_key" {
+  type      = string
+  sensitive = true
+  default   = "CHANGE_ME_GENERATE_A_REAL_KEY"
+}
+
+variable "vpn_subnet" {
+  type    = string
+  default = "10.99.0.0/24"
+}
+
+variable "do_vpn_ip" {
+  type    = string
+  default = "10.99.0.1"
+}
+
+variable "pm_vpn_ip" {
+  type    = string
+  default = "10.99.0.2"
+}
+
+###################
+# Proxmox (On-Prem — Dual Node HA/DR)
 ###################
 
 variable "pm_endpoint" {
-  type        = string
-  description = "Proxmox API endpoint URL"
-  sensitive   = true
+  type      = string
+  sensitive = true
+  description = "Primary Proxmox API endpoint (hyper100)"
 }
 
 variable "pm_api_token" {
-  type        = string
+  type      = string
+  sensitive = true
   description = "Proxmox API token (format: user@pve!tokenid=secret)"
-  sensitive   = true
 }
 
 variable "pm_insecure" {
-  type        = bool
-  description = "Skip TLS verification for Proxmox API (use false in production)"
-  default     = true
+  type  = bool
+  default = true
+  description = "Skip TLS verification (set false with valid certs)"
 }
 
 variable "pm_node_name" {
-  type        = string
-  description = "Proxmox node name to deploy VMs on"
-  default     = "pve1"
+  type    = string
+  default = "hyper100"
+  description = "Primary Proxmox node name"
+}
+
+variable "pm_node2_name" {
+  type    = string
+  default = "hyper101"
+  description = "Secondary Proxmox node name (DR target)"
 }
 
 variable "pm_vm_template" {
-  type        = string
-  description = "Proxmox VM template to clone"
-  default     = "debian-12-template"
-}
-
-variable "pm_vm_count" {
-  type        = number
-  description = "Number of on-prem VMs"
-  default     = 1
-}
-
-variable "pm_vm_memory" {
-  type        = number
-  description = "Memory in MB for on-prem VMs"
-  default     = 4096
-}
-
-variable "pm_vm_cores" {
-  type        = number
-  description = "CPU cores for on-prem VMs"
-  default     = 2
-}
-
-variable "pm_vm_disk_size" {
-  type        = number
-  description = "Disk size in GB for on-prem VMs"
-  default     = 30
+  type    = string
+  default = "debian-12-template"
 }
 
 variable "pm_bridge_name" {
-  type        = string
-  description = "Proxmox network bridge for VMs"
-  default     = "vmbr0"
+  type    = string
+  default = "vmbr0"
+}
+
+# Web front-end VMs
+variable "pm_web_count" {
+  type    = number
+  default = 2
+}
+
+variable "pm_web_memory" {
+  type    = number
+  default = 2048
+}
+
+variable "pm_web_cores" {
+  type    = number
+  default = 2
+}
+
+variable "pm_web_disk" {
+  type    = number
+  default = 20
+}
+
+# App server VMs
+variable "pm_app_count" {
+  type    = number
+  default = 2
+}
+
+variable "pm_app_memory" {
+  type    = number
+  default = 4096
+}
+
+variable "pm_app_cores" {
+  type    = number
+  default = 4
+}
+
+variable "pm_app_disk" {
+  type    = number
+  default = 40
+}
+
+# Database VM
+variable "pm_db_memory" {
+  type    = number
+  default = 8192
+}
+
+variable "pm_db_cores" {
+  type    = number
+  default = 4
+}
+
+variable "pm_db_disk" {
+  type    = number
+  default = 100
+}
+
+###################
+# Network Segments
+###################
+
+variable "pm_web_subnet" {
+  type    = string
+  default = "10.10.1.0/24"
+}
+
+variable "pm_app_subnet" {
+  type    = string
+  default = "10.10.2.0/24"
+}
+
+variable "pm_db_subnet" {
+  type    = string
+  default = "10.10.3.0/24"
 }

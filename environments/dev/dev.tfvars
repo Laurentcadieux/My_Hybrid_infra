@@ -2,22 +2,43 @@ project_name    = "hybrid-infra"
 environment     = "dev"
 region          = "nyc1"
 
-# SSH — paste your public key or load from file
+# SSH — paste your public key here
 # Run: cat keys/hybrid-infra-admin.pub
 ssh_public_key  = "PASTE_YOUR_PUBLIC_KEY_HERE"
 
-# DigitalOcean droplet config
-do_droplet_size = "s-2vcpu-4gb"
-do_droplet_count = 2
-do_db_engine    = "pg"
-do_db_size      = "db-s-1vcpu-1gb"
-do_db_node_count = 1
+# DigitalOcean edge (light — Nginx reverse proxy only)
+do_droplet_size = "s-1vcpu-1gb"
 
-# Proxmox on-prem config
-pm_node_name    = "pve1"
-pm_vm_template  = "debian-12-template"
-pm_vm_count     = 1
-pm_vm_memory    = 4096
-pm_vm_cores     = 2
-pm_vm_disk_size = 30
-pm_bridge_name  = "vmbr0"
+# VPN (DO ↔ Proxmox)
+vpn_preshared_key = "CHANGE_ME_GENERATE_A_REAL_KEY"
+vpn_subnet        = "10.99.0.0/24"
+do_vpn_ip         = "10.99.0.1"
+pm_vpn_ip         = "10.99.0.2"
+
+# Proxmox dual-node HA/DR
+pm_node_name   = "hyper100"
+pm_node2_name  = "hyper101"
+pm_vm_template = "debian-12-template"
+pm_bridge_name = "vmbr0"
+
+# Web front-end VMs (spread across both nodes)
+pm_web_count   = 2
+pm_web_memory  = 2048
+pm_web_cores   = 2
+pm_web_disk    = 20
+
+# App server VMs (spread across both nodes)
+pm_app_count   = 2
+pm_app_memory  = 4096
+pm_app_cores   = 4
+pm_app_disk    = 40
+
+# Database VM (primary on hyper100, DR replica on hyper101)
+pm_db_memory  = 8192
+pm_db_cores   = 4
+pm_db_disk    = 100
+
+# Network segments
+pm_web_subnet = "10.10.1.0/24"
+pm_app_subnet = "10.10.2.0/24"
+pm_db_subnet  = "10.10.3.0/24"
