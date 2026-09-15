@@ -17,6 +17,8 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 .terraform.tfstate.lock.info
+tfplan
+*.tfplan
 
 # Keys — NEVER commit
 keys/
