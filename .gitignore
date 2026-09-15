@@ -4,6 +4,8 @@
 secrets.*.tfvars
 secrets.tfvars
 *secrets*.tfvars
+credentials.tfvars
+*credentials*.tfvars
 *.auto.tfvars
 *.auto.tfvars.json
 .terraform/

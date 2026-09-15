@@ -3,15 +3,13 @@
 ###################
 
 variable "project_name" {
-  type        = string
-  description = "Project name for resource naming"
-  default     = "hybrid-infra"
+  type    = string
+  default = "hybrid-infra"
 }
 
 variable "environment" {
-  type        = string
-  description = "Environment (dev, staging, prod)"
-  default     = "dev"
+  type    = string
+  default = "dev"
   validation {
     condition     = contains(["dev", "staging", "prod"], var.environment)
     error_message = "Must be dev, staging, or prod."
@@ -19,9 +17,8 @@ variable "environment" {
 }
 
 variable "region" {
-  type        = string
-  description = "DigitalOcean region"
-  default     = "nyc1"
+  type    = string
+  default = "nyc1"
 }
 
 ###################
@@ -33,13 +30,8 @@ variable "ssh_public_key" {
   sensitive = true
 }
 
-variable "ssh_private_key_path" {
-  type    = string
-  default = "keys/hybrid-infra-admin"
-}
-
 ###################
-# DigitalOcean (Light Edge / DMZ)
+# DigitalOcean
 ###################
 
 variable "do_token" {
@@ -53,13 +45,32 @@ variable "do_droplet_size" {
 }
 
 ###################
-# VPN (DO ↔ Proxmox)
+# WireGuard VPN
 ###################
 
 variable "vpn_preshared_key" {
   type      = string
   sensitive = true
-  default   = "CHANGE_ME_GENERATE_A_REAL_KEY"
+}
+
+variable "do_wg_private_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "do_wg_public_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "pm_wg_private_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "pm_wg_public_key" {
+  type      = string
+  sensitive = true
 }
 
 variable "vpn_subnet" {
@@ -78,42 +89,32 @@ variable "pm_vpn_ip" {
 }
 
 ###################
-# Proxmox (On-Prem — Dual Node HA/DR)
+# Proxmox
 ###################
 
 variable "pm_endpoint" {
   type      = string
   sensitive = true
-  description = "Primary Proxmox API endpoint (hyper100)"
 }
 
 variable "pm_api_token" {
   type      = string
   sensitive = true
-  description = "Proxmox API token (format: user@pve!tokenid=secret)"
 }
 
 variable "pm_insecure" {
-  type  = bool
+  type    = bool
   default = true
-  description = "Skip TLS verification (set false with valid certs)"
 }
 
 variable "pm_node_name" {
   type    = string
-  default = "hyper100"
-  description = "Primary Proxmox node name"
-}
-
-variable "pm_node2_name" {
-  type    = string
   default = "hyper101"
-  description = "Secondary Proxmox node name (DR target)"
 }
 
-variable "pm_vm_template" {
-  type    = string
-  default = "debian-12-template"
+variable "pm_vm_template_id" {
+  type    = number
+  default = 104
 }
 
 variable "pm_bridge_name" {
@@ -121,79 +122,47 @@ variable "pm_bridge_name" {
   default = "vmbr0"
 }
 
-# Web front-end VMs
-variable "pm_web_count" {
-  type    = number
-  default = 2
-}
-
-variable "pm_web_memory" {
+variable "pm_web_cv_memory" {
   type    = number
   default = 2048
 }
 
-variable "pm_web_cores" {
+variable "pm_web_cv_cores" {
   type    = number
   default = 2
 }
 
-variable "pm_web_disk" {
+variable "pm_web_cv_disk" {
   type    = number
-  default = 20
+  default = 32
 }
 
-# App server VMs
-variable "pm_app_count" {
+# VPN Gateway VM
+variable "pm_vpn_gw_memory" {
   type    = number
-  default = 2
+  default = 1024
 }
 
-variable "pm_app_memory" {
+variable "pm_vpn_gw_cores" {
   type    = number
-  default = 4096
+  default = 1
 }
 
-variable "pm_app_cores" {
+variable "pm_vpn_gw_disk" {
   type    = number
-  default = 4
-}
-
-variable "pm_app_disk" {
-  type    = number
-  default = 40
-}
-
-# Database VM
-variable "pm_db_memory" {
-  type    = number
-  default = 8192
-}
-
-variable "pm_db_cores" {
-  type    = number
-  default = 4
-}
-
-variable "pm_db_disk" {
-  type    = number
-  default = 100
+  default = 32
 }
 
 ###################
-# Network Segments
+# Website
 ###################
 
-variable "pm_web_subnet" {
+variable "site_domain" {
   type    = string
-  default = "10.10.1.0/24"
+  default = "laurentcadieux.online"
 }
 
-variable "pm_app_subnet" {
+variable "site_repo_url" {
   type    = string
-  default = "10.10.2.0/24"
-}
-
-variable "pm_db_subnet" {
-  type    = string
-  default = "10.10.3.0/24"
+  default = "https://github.com/Laurentcadieux/LaurentCadieuxDOTonline.git"
 }

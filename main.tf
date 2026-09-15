@@ -14,7 +14,7 @@ terraform {
 
   backend "azurerm" {
     resource_group_name  = "rg-terraform-state"
-    storage_account_name = "stterraformstate"
+    storage_account_name = "hermesterraformstate"
     container_name       = "tfstate"
     key                  = "my-hybrid-infra-dev.tfstate"
   }
@@ -25,9 +25,9 @@ provider "digitalocean" {
 }
 
 provider "proxmox" {
-  endpoint   = var.pm_endpoint
-  api_token  = var.pm_api_token
-  insecure   = var.pm_insecure
+  endpoint  = var.pm_endpoint
+  api_token = var.pm_api_token
+  insecure  = var.pm_insecure
   ssh {
     agent = true
   }
