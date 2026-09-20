@@ -5,27 +5,32 @@ Hybrid infrastructure hosting **[laurentcadieux.online](https://laurentcadieux.o
 ## Architecture
 
 ```
-Internet → DO Nginx (SSL :443) → WireGuard → Proxmox VPN VM → vmbr0 → web-CV VM
+Internet → DO Nginx (SSL :443) → WireGuard → Proxmox VPN VM → vmbr0 → web-CV + AVH VMs
 ```
 
 ```
-                    ┌─────────────────────────────────────────────┐
-   Internet ──────▶ │   DigitalOcean NYC1                         │
-   DNS → DO IP      │   Nginx DMZ (s-1vcpu-1gb) + WireGuard server  │
-   :443 SSL         │   192.241.155.248                            │
-   :80 → 301 HTTPS  └──────────────┬──────────────────────────────┘
+                    ┌─────────────────────────────────────────────────┐
+   Internet ──────▶ │  DigitalOcean NYC1                              │
+   DNS → DO IP      │  Nginx DMZ (s-1vcpu-1gb) + WireGuard server     │
+   :443 SSL         │  137.184.59.186 (public)                        │
+   :80 → 301 HTTPS  │  Sites: laurentcadieux.online → :80 (CV VM)   │
+                    │         agenticvaluehub.com   → :3000 (AVH VM) │
+                    └──────────────┬──────────────────────────────────┘
                                    │ WireGuard (10.99.0.0/24, outbound)
-                    ┌──────────────┼──────────────────────────────┐
-                    │  Proxmox hyper101 (Private, Outbound Only) │
-                    │  ┌───────────┴──────────┐                    │
-                    │  │  VPN Gateway VM (106) │                    │
-                    │  │  WireGuard client     │                    │
-                    │  └───────────┬──────────┘                    │
-                    │  ┌───────────┴──────────┐                    │
-                    │  │  web-CV VM (105)      │                    │
-                    │  │  Nginx + React/Vite   │                    │
-                    │  └──────────────────────┘                    │
-                    └─────────────────────────────────────────────┘
+                    ┌──────────────┼──────────────────────────────────┐
+                    │  Proxmox hyper101 (Private, Outbound Only)     │
+                    │  ┌───────────┴──────────┐                       │
+                    │  │  VPN Gateway VM (105) │                       │
+                    │  │  WireGuard client     │ 192.168.0.106       │
+                    │  └───────────┬──────────┘                       │
+                    │              │ vmbr0                             │
+                    │  ┌───────────┴──┐  ┌──────────────┐  ┌──────────┐│
+                    │  │ web-CV (106)  │  │ AVH VM (107) │  │DB (108) ││
+                    │  │ Nginx+React   │  │ Next.js :3000│  │PostgreSQL│
+                    │  │ 192.168.0.105 │  │192.168.0.110 │  │16:5432  ││
+                    │  └──────────────┘  └──────┬───────┘  │.0.111   ││
+                    │                           │ :5432    └──────────┘│
+                    └──────────────────────────────────────────────────┘
 ```
 
 ## Multi-State Terraform + Ansible
