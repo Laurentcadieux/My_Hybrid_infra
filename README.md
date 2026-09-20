@@ -36,7 +36,8 @@ Infrastructure is split into independent layers:
 |-------|-----------|-----------------|----------------|
 | Shared | `shared.tfstate` | DO edge + VPN gateway | Adding new sites to Nginx, changing VPN |
 | Project CV | `project-cv.tfstate` | web-CV VM (laurentcadieux.online) | Changing VM specs |
-| Project AVH | `project-avh.tfstate` | AVH VM (agenticvaluehub.com) | Changing VM specs |
+| Project AVH | `project-avh.tfstate` | AVH app VM (agenticvaluehub.com) | Changing VM specs |
+| Project AVH DB | `project-avh-db.tfstate` | AVH database VM (PostgreSQL) | Changing DB specs |
 | Ansible | — | Software on VMs | Deploying apps, updates, hardening |
 
 **Terraform** creates infrastructure (VMs, droplets, firewalls).
@@ -60,9 +61,15 @@ My_Hybrid_infra/
 │       ├── variables.tf
 │       ├── dev.tfvars
 │       └── credentials.tfvars
-│   └── project-avh/          # agenticvaluehub.com (AVH VM)
+│   ├── project-avh/          # agenticvaluehub.com (AVH app VM)
 │       ├── main.tf          # Providers + backend (project-avh.tfstate)
 │       ├── main-modules.tf  # AVH VM module
+│       ├── variables.tf
+│       ├── dev.tfvars
+│       └── credentials.tfvars
+│   └── project-avh-db/      # AVH database (PostgreSQL VM)
+│       ├── main.tf          # Providers + backend (project-avh-db.tfstate)
+│       ├── main-modules.tf  # DB VM module
 │       ├── variables.tf
 │       ├── dev.tfvars
 │       └── credentials.tfvars
@@ -204,6 +211,7 @@ Workflows run automatically on push/PR to main:
 | `terraform-shared.yml` | Changes in `environments/shared/` or `modules/` | Plan on PR, apply on push to main |
 | `terraform-project-cv.yml` | Changes in `environments/project-cv/` | Plan on PR, apply on push to main |
 | `terraform-project-avh.yml` | Changes in `environments/project-avh/` | Plan on PR, apply on push to main |
+| `terraform-project-avh-db.yml` | Changes in `environments/project-avh-db/` | Plan on PR, apply on push to main |
 | `deploy-website.yml` | Manual or repository_dispatch | Ansible deploy to web-CV VM |
 
 ### Required GitHub Secrets
