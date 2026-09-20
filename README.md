@@ -35,7 +35,8 @@ Infrastructure is split into independent layers:
 | Layer | State File | What it manages | When to change |
 |-------|-----------|-----------------|----------------|
 | Shared | `shared.tfstate` | DO edge + VPN gateway | Adding new sites to Nginx, changing VPN |
-| Project | `project-cv.tfstate` | web-CV VM | Changing VM specs, adding projects |
+| Project CV | `project-cv.tfstate` | web-CV VM (laurentcadieux.online) | Changing VM specs |
+| Project AVH | `project-avh.tfstate` | AVH VM (agenticvaluehub.com) | Changing VM specs |
 | Ansible | — | Software on VMs | Deploying apps, updates, hardening |
 
 **Terraform** creates infrastructure (VMs, droplets, firewalls).
@@ -53,9 +54,15 @@ My_Hybrid_infra/
 │   │   ├── dev.tfvars        # Config (committed)
 │   │   ├── secrets.tfvars    # WireGuard keys (gitignored)
 │   │   └── credentials.tfvars # API tokens (gitignored)
-│   └── project-cv/          # laurentcadieux.online
+│   ├── project-cv/          # laurentcadieux.online (web-CV VM)
 │       ├── main.tf          # Providers + backend (project-cv.tfstate)
 │       ├── main-modules.tf  # web-CV VM module
+│       ├── variables.tf
+│       ├── dev.tfvars
+│       └── credentials.tfvars
+│   └── project-avh/          # agenticvaluehub.com (AVH VM)
+│       ├── main.tf          # Providers + backend (project-avh.tfstate)
+│       ├── main-modules.tf  # AVH VM module
 │       ├── variables.tf
 │       ├── dev.tfvars
 │       └── credentials.tfvars
@@ -145,6 +152,12 @@ sites = {
     backend_port = 80
     ssl          = true
   }
+  "avh" = {
+    domain       = "agenticvaluehub.com"
+    backend_ip   = "192.168.0.110"
+    backend_port = 3000
+    ssl          = true
+  }
   # New site:
   "saas-1" = {
     domain       = "app.myother.com"
@@ -190,6 +203,7 @@ Workflows run automatically on push/PR to main:
 |----------|----------|--------|
 | `terraform-shared.yml` | Changes in `environments/shared/` or `modules/` | Plan on PR, apply on push to main |
 | `terraform-project-cv.yml` | Changes in `environments/project-cv/` | Plan on PR, apply on push to main |
+| `terraform-project-avh.yml` | Changes in `environments/project-avh/` | Plan on PR, apply on push to main |
 | `deploy-website.yml` | Manual or repository_dispatch | Ansible deploy to web-CV VM |
 
 ### Required GitHub Secrets
