@@ -22,6 +22,12 @@ module "do_edge" {
       backend_port = 80
       ssl          = true
     }
+    "avh" = {
+      domain       = "agenticvaluehub.com"
+      backend_ip   = "192.168.0.105"
+      backend_port = 3000
+      ssl          = true
+    }
     # Add new sites like this:
     # "saas-1" = {
     #   domain       = "app.myother.com"
