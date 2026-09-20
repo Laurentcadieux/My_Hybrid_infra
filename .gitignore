@@ -9,7 +9,6 @@ credentials.tfvars
 *.auto.tfvars
 *.auto.tfvars.json
 .terraform/
-.terraform.lock.hcl
 crash.log
 crash.*.log
 override.tf
@@ -32,16 +31,6 @@ keys/
 # Environment files
 .env
 .env.*
-*.env
-
-# Proxmox
-proxmox-*
-
-# DigitalOcean
-do-*
-
-# Azure
-azure-*
 
 # OS
 .DS_Store

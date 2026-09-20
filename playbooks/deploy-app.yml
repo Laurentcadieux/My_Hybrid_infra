@@ -1,0 +1,11 @@
+---
+# Deploy any web app to a Proxmox VM
+# Usage: ansible-playbook playbooks/deploy-app.yml -i inventory/hosts.yml \
+#   -e target=web_cv -e app_repo=https://github.com/user/repo.git \
+#   -e app_domain=mydomain.com
+
+- name: Deploy web app
+  hosts: "{{ target | default('web_cv') }}"
+  become: yes
+  roles:
+    - web-app

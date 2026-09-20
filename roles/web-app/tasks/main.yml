@@ -1,0 +1,49 @@
+---
+# Generic web app role — installs Nginx, clones repo, builds if needed
+# Use for any static/Node.js web project
+- name: Install packages
+  ansible.builtin.apt:
+    name: [nginx, git, curl]
+    state: present
+    update_cache: yes
+
+- name: Install Node.js 20 (if needed)
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+
+- name: Clone app repo
+  ansible.builtin.git:
+    repo: "{{ app_repo }}"
+    dest: "/var/www/{{ app_domain }}"
+    force: yes
+
+- name: Install npm dependencies (if package.json exists)
+  ansible.builtin.shell: "cd /var/www/{{ app_domain }} && npm install"
+  args:
+    creates: "/var/www/{{ app_domain }}/node_modules"
+
+- name: Build app (if build script exists)
+  ansible.builtin.shell: "cd /var/www/{{ app_domain }} && npm run build"
+  when: build_app | default(true)
+
+- name: Write Nginx config
+  ansible.builtin.template:
+    src: web-app.conf.j2
+    dest: "/etc/nginx/sites-available/{{ app_domain }}.conf"
+  notify: reload nginx
+
+- name: Enable site
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ app_domain }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ app_domain }}.conf"
+    state: link
+  notify: reload nginx
+
+- name: Remove default site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx

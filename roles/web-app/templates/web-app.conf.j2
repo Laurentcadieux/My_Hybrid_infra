@@ -1,0 +1,18 @@
+server {
+    listen 80;
+    server_name {{ app_domain }} www.{{ app_domain }};
+    root /var/www/{{ app_domain }}{% if build_app | default(true) %}/dist{% endif %};
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+{% if api_backend_port is defined %}
+    location /api/ {
+        proxy_pass http://127.0.0.1:{{ api_backend_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+{% endif %}
+}
