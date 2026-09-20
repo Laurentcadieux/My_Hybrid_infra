@@ -24,7 +24,7 @@ module "do_edge" {
     }
     "avh" = {
       domain       = "agenticvaluehub.com"
-      backend_ip   = "192.168.0.105"
+      backend_ip   = "192.168.0.110"
       backend_port = 3000
       ssl          = true
     }
