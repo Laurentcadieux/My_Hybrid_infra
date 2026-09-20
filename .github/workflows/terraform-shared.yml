@@ -13,6 +13,7 @@ on:
       - "environments/shared/**"
       - "modules/digitalocean-edge/**"
       - "modules/proxmox-vm/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -40,16 +41,31 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "${{ secrets.DO_TOKEN }}" ]; then
+            echo "has_secrets=false" >> $GITHUB_OUTPUT
+            echo "⚠️ GitHub Secrets not configured yet — skipping Terraform"
+          else
+            echo "has_secrets=true" >> $GITHUB_OUTPUT
+            echo "✅ Secrets configured"
+          fi
+
       - name: Terraform Format
+        if: steps.secrets.outputs.has_secrets == 'true'
         run: terraform fmt -check
 
       - name: Terraform Init
+        if: steps.secrets.outputs.has_secrets == 'true'
         run: terraform init
 
       - name: Terraform Validate
+        if: steps.secrets.outputs.has_secrets == 'true'
         run: terraform validate
 
       - name: Terraform Plan
+        if: steps.secrets.outputs.has_secrets == 'true'
         run: |
           terraform plan \
             -var-file=dev.tfvars \
@@ -63,7 +79,7 @@ jobs:
             -no-color
 
       - name: Terraform Apply (main only)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: steps.secrets.outputs.has_secrets == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           terraform apply -auto-approve \
             -var-file=dev.tfvars \
