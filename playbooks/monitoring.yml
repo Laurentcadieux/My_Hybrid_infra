@@ -1,0 +1,11 @@
+---
+# Install monitoring (Uptime Kuma on DO edge)
+# Usage: ansible-playbook playbooks/monitoring.yml -i inventory/hosts.yml
+
+- name: Install Uptime Kuma monitoring
+  hosts: nginx
+  become: yes
+  roles:
+    - monitoring
+  vars:
+    site_domain: laurentcadieux.online

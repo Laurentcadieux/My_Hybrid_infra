@@ -181,3 +181,50 @@ Nginx config and security headers are generated automatically. No manual Nginx e
 - SSH key pair in `keys/`
 - `.env` with DO token, Proxmox token, Azure SP credentials
 - Proxmox template (VM 104: Ubuntu 24.04 with cloud-init)
+
+## CI/CD (GitHub Actions)
+
+Workflows run automatically on push/PR to main:
+
+| Workflow | Triggers | Action |
+|----------|----------|--------|
+| `terraform-shared.yml` | Changes in `environments/shared/` or `modules/` | Plan on PR, apply on push to main |
+| `terraform-project-cv.yml` | Changes in `environments/project-cv/` | Plan on PR, apply on push to main |
+| `deploy-website.yml` | Manual or repository_dispatch | Ansible deploy to web-CV VM |
+
+### Required GitHub Secrets
+
+Set these in https://github.com/Laurentcadieux/My_Hybrid_infra/settings/secrets/actions:
+
+| Secret | Description |
+|--------|-------------|
+| `DO_TOKEN` | DigitalOcean API token |
+| `PM_API_TOKEN` | Proxmox API token |
+| `PM_ENDPOINT` | Proxmox API URL |
+| `SSH_PUBLIC_KEY` | SSH public key for VMs |
+| `DO_WG_PRIVATE_KEY` | DO WireGuard private key |
+| `PM_WG_PUBLIC_KEY` | Proxmox WireGuard public key |
+| `VPN_PSK` | WireGuard preshared key |
+| `ARM_CLIENT_ID` | Azure SP client ID |
+| `ARM_CLIENT_SECRET` | Azure SP secret |
+| `ARM_SUBSCRIPTION_ID` | Azure subscription ID |
+| `ARM_TENANT_ID` | Azure tenant ID |
+| `DEPLOY_SSH_KEY` | SSH private key for Ansible deploys |
+
+## Monitoring (Phase 5)
+
+Uptime Kuma runs on the DO edge droplet via Docker, accessible at `status.laurentcadieux.online`:
+
+```bash
+# Install monitoring
+ansible-playbook playbooks/monitoring.yml -i inventory/hosts.yml
+
+# Then point status.laurentcadieux.online DNS to 192.241.155.248
+# Run certbot for the status subdomain
+```
+
+Features:
+- HTTP/HTTPS uptime monitoring for all sites
+- Response time tracking
+- Notification via email, Discord, Telegram, etc.
+- Status page at `https://status.laurentcadieux.online`

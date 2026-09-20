@@ -1,0 +1,38 @@
+name: Deploy Website
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [deploy-cv]
+
+jobs:
+  deploy:
+    name: Deploy to web-CV VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan 192.168.0.106 192.168.0.105 >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy website
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: False
+        run: |
+          ansible-playbook playbooks/deploy-site.yml \
+            -i inventory/hosts.yml \
+            -e site_repo=https://github.com/Laurentcadieux/LaurentCadieuxDOTonline.git \
+            -e site_domain=laurentcadieux.online
+
+      - name: Verify site
+        run: |
+          sleep 5
+          curl -s -o /dev/null -w "HTTP %{http_code}" https://laurentcadieux.online

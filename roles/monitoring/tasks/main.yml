@@ -1,0 +1,42 @@
+---
+# Install Uptime Kuma via Docker on the DO edge droplet
+- name: Install Docker
+  ansible.builtin.apt:
+    name: [docker.io, docker-compose-v2]
+    state: present
+    update_cache: yes
+
+- name: Create Uptime Kuma directory
+  ansible.builtin.file:
+    path: /opt/uptime-kuma
+    state: directory
+    mode: "0755"
+
+- name: Write docker-compose
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/uptime-kuma/docker-compose.yml
+  notify: restart kuma
+
+- name: Start Uptime Kuma
+  ansible.builtin.shell: cd /opt/uptime-kuma && docker compose up -d
+  changed_when: false
+
+- name: Allow Kuma port in UFW
+  community.general.ufw:
+    rule: allow
+    port: "3001"
+    proto: tcp
+
+- name: Add Kuma to Nginx (status subdomain)
+  ansible.builtin.template:
+    src: kuma-nginx.conf.j2
+    dest: /etc/nginx/sites-available/kuma.conf
+  notify: reload nginx
+
+- name: Enable Kuma site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/kuma.conf
+    dest: /etc/nginx/sites-enabled/kuma.conf
+    state: link
+  notify: reload nginx
