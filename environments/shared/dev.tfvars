@@ -17,10 +17,13 @@ pm_vpn_ip  = "10.99.0.2"
 pm_node_name      = "hyper101"
 pm_vm_template_id = 104
 pm_bridge_name    = "vmbr0"
-pm_web_cv_memory  = 2048
-pm_web_cv_cores   = 2
-pm_web_cv_disk    = 32
+pm_vpn_gw_memory  = 1024
+pm_vpn_gw_cores   = 1
+pm_vpn_gw_disk    = 32
+pm_vpn_gw_static_ip = "192.168.0.106"
+pm_vpn_gw_gateway   = "192.168.0.1"
 
-# Website
+# Nginx proxy — update backend_host when adding new projects
 site_domain   = "laurentcadieux.online"
-site_repo_url = "https://github.com/Laurentcadieux/LaurentCadieuxDOTonline.git"
+backend_host  = "192.168.0.105"
+backend_port  = 80

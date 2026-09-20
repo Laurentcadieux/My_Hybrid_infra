@@ -10,10 +10,6 @@ variable "project_name" {
 variable "environment" {
   type    = string
   default = "dev"
-  validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Must be dev, staging, or prod."
-  }
 }
 
 variable "region" {
@@ -54,16 +50,6 @@ variable "vpn_preshared_key" {
 }
 
 variable "do_wg_private_key" {
-  type      = string
-  sensitive = true
-}
-
-variable "do_wg_public_key" {
-  type      = string
-  sensitive = true
-}
-
-variable "pm_wg_private_key" {
   type      = string
   sensitive = true
 }
@@ -122,22 +108,6 @@ variable "pm_bridge_name" {
   default = "vmbr0"
 }
 
-variable "pm_web_cv_memory" {
-  type    = number
-  default = 2048
-}
-
-variable "pm_web_cv_cores" {
-  type    = number
-  default = 2
-}
-
-variable "pm_web_cv_disk" {
-  type    = number
-  default = 32
-}
-
-# VPN Gateway VM
 variable "pm_vpn_gw_memory" {
   type    = number
   default = 1024
@@ -153,8 +123,18 @@ variable "pm_vpn_gw_disk" {
   default = 32
 }
 
+variable "pm_vpn_gw_static_ip" {
+  type    = string
+  default = "192.168.0.106"
+}
+
+variable "pm_vpn_gw_gateway" {
+  type    = string
+  default = "192.168.0.1"
+}
+
 ###################
-# Website
+# Sites (for Nginx proxy config)
 ###################
 
 variable "site_domain" {
@@ -162,7 +142,12 @@ variable "site_domain" {
   default = "laurentcadieux.online"
 }
 
-variable "site_repo_url" {
+variable "backend_host" {
   type    = string
-  default = "https://github.com/Laurentcadieux/LaurentCadieuxDOTonline.git"
+  default = "192.168.0.105"
+}
+
+variable "backend_port" {
+  type    = number
+  default = 80
 }

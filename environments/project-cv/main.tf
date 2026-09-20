@@ -2,10 +2,6 @@ terraform {
   required_version = ">= 1.7.0"
 
   required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
-    }
     proxmox = {
       source  = "bpg/proxmox"
       version = "~> 0.0"
@@ -16,12 +12,8 @@ terraform {
     resource_group_name  = "rg-terraform-state"
     storage_account_name = "hermesterraformstate"
     container_name       = "tfstate"
-    key                  = "my-hybrid-infra-dev.tfstate"
+    key                  = "project-cv.tfstate"
   }
-}
-
-provider "digitalocean" {
-  token = var.do_token
 }
 
 provider "proxmox" {

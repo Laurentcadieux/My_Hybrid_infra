@@ -5,191 +5,171 @@ Hybrid infrastructure hosting **[laurentcadieux.online](https://laurentcadieux.o
 ## Architecture
 
 ```
+Internet → DO Nginx (SSL :443) → WireGuard → Proxmox VPN VM → vmbr0 → web-CV VM
+```
+
+```
                     ┌─────────────────────────────────────────────┐
                     │            DigitalOcean (NYC1)               │
-                    │                                             │
-   Internet ──────▶ │   ┌──────────────────────┐                   │
-   DNS → DO IP      │   │  Nginx DMZ Droplet   │                   │
-   :443 (SSL)       │   │  s-1vcpu-1gb         │                   │
-   :80 → 301 HTTPS  │   │  Let's Encrypt SSL   │                   │
-                    │   │  WireGuard server     │                   │
-                    │   └──────────┬───────────┘                   │
-                    │              │ wg0: 10.99.0.1                  │
-                    └──────────────┼───────────────────────────────┘
+   Internet ──────▶ │   Nginx DMZ (s-1vcpu-1gb, Debian 13)        │
+   DNS → DO IP      │   SSL: Let's Encrypt • WireGuard server     │
+   :443 (SSL)       │   192.241.155.248 (public)                   │
+   :80 → 301 HTTPS  └──────────────┬──────────────────────────────┘
                                    │ WireGuard VPN (10.99.0.0/24)
                                    │ DO listens, Proxmox connects outbound
-                                   │
-                    ┌──────────────┼───────────────────────────────┐
-                    │  Proxmox VE — hyper101 (On-Prem, Private)    │
-                    │              │                               │
-                    │  ┌───────────┴──────────┐                    │
-                    │  │  VPN Gateway VM (106) │                    │
-                    │  │  WireGuard client     │                    │
-                    │  │  wg0: 10.99.0.2       │                    │
-                    │  │  IP forwarding + NAT   │                    │
-                    │  └───────────┬──────────┘                    │
-                    │              │ vmbr0                          │
-                    │  ┌───────────┴──────────┐                    │
-                    │  │  web-CV VM (105)      │                    │
-                    │  │  Nginx (React/Vite)   │                    │
-                    │  │  Java Voice GW :8088  │                    │
-                    │  │  192.168.0.105        │                    │
-                    │  └──────────────────────┘                    │
+                    ┌──────────────┼──────────────────────────────┐
+                    │  Proxmox VE — hyper101 (Private)           │
+                    │  ┌───────────┴──────────┐                   │
+                    │  │  VPN Gateway VM (106) │                   │
+                    │  │  WireGuard client     │                   │
+                    │  │  10.99.0.2 → vmbr0    │                   │
+                    │  └───────────┬──────────┘                   │
+                    │  ┌───────────┴──────────┐                   │
+                    │  │  web-CV VM (105)      │                   │
+                    │  │  Nginx + React/Vite   │                   │
+                    │  │  192.168.0.105        │                   │
+                    │  └──────────────────────┘                   │
                     └─────────────────────────────────────────────┘
 ```
 
-## Design
+## Multi-State Architecture
 
-- **DigitalOcean = light edge**: single Nginx reverse proxy, SSL termination, WireGuard server. No app logic in the cloud.
-- **Proxmox = all workloads**: VPN gateway VM routes tunnel traffic to web-CV VM serving the website.
-- **WireGuard**: DO is the server (listens on :51820). Proxmox VM connects outbound — no public Proxmox endpoint needed.
-- **No database**: static React/Vite site + Java voice gateway.
-- **No third-party accounts**: pure WireGuard, no Tailscale/Cloudflare.
+The infrastructure is split into **independent Terraform states** so projects can be added/removed without affecting each other:
+
+```
+environments/
+├── shared/          # DO edge + VPN gateway — always on, shared by all projects
+│   ├── main.tf             # Providers + Azure backend (shared.tfstate)
+│   ├── main-modules.tf     # DO edge + VPN gateway modules
+│   ├── variables.tf
+│   ├── dev.tfvars           # Config (committed, no secrets)
+│   ├── secrets.tfvars       # WireGuard keys (gitignored)
+│   └── credentials.tfvars   # API tokens (gitignored)
+│
+└── project-cv/      # laurentcadieux.online — one project
+    ├── main.tf             # Providers + Azure backend (project-cv.tfstate)
+    ├── main-modules.tf     # web-CV VM module
+    ├── variables.tf
+    ├── dev.tfvars           # Config (committed, no secrets)
+    └── credentials.tfvars   # API tokens (gitignored)
+```
+
+### Adding a New Project
+
+```bash
+# 1. Create a new environment directory
+mkdir -p environments/project-saas-1
+
+# 2. Copy the project-cv structure and adapt
+cp environments/project-cv/main.tf environments/project-saas-1/
+cp environments/project-cv/credentials.tfvars environments/project-saas-1/
+
+# 3. Edit main.tf: change the backend key to "project-saas-1.tfstate"
+# 4. Edit main-modules.tf: change VM name, IP, specs
+# 5. Create dev.tfvars with the new VM config
+
+# 6. Initialize and apply the new project
+cd environments/project-saas-1
+terraform init
+terraform apply -var-file=dev.tfvars -var-file=credentials.tfvars
+
+# 7. Add the new site to the shared Nginx config:
+#    Edit environments/shared/dev.tfvars → update backend_host
+#    Or add a new server block to the DO droplet's Nginx
+cd ../shared
+terraform apply -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
+```
+
+Each project has its own state — destroying project-saas-1 won't touch the CV site or the shared edge.
+
+## Usage
+
+### Shared Infrastructure (DO edge + VPN gateway)
+```bash
+cd environments/shared
+set -a && source ../../.env && set +a
+terraform init
+terraform plan -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
+terraform apply -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
+```
+
+### Project: CV (web-CV VM)
+```bash
+cd environments/project-cv
+set -a && source ../../.env && set +a
+terraform init
+terraform plan -var-file=dev.tfvars -var-file=credentials.tfvars
+terraform apply -var-file=dev.tfvars -var-file=credentials.tfvars
+```
 
 ## Components
 
-| Component | Location | IP | Spec |
-|-----------|----------|----|------|
-| Nginx edge + SSL | DigitalOcean NYC1 | 192.241.155.248 (public) | s-1vcpu-1gb, Debian 13 |
-| WireGuard server | DO droplet | 10.99.0.1 | Port 51820/UDP |
-| VPN gateway VM | Proxmox hyper101 | 192.168.0.106 | 1 vCPU, 1GB, 32GB |
-| WireGuard client | VPN gateway VM | 10.99.0.2 | Outbound to DO |
-| web-CV VM | Proxmox hyper101 | 192.168.0.105 (DHCP) | 2 vCPU, 2GB, 32GB |
-| Website | web-CV VM | localhost:80 | React 19 + Vite 6 |
-| Voice gateway | web-CV VM | localhost:8088 | Java 17 |
-| SSL cert | DO droplet | — | Let's Encrypt, auto-renew |
-| Terraform state | Azure Storage | — | rg-terraform-state / hermesterraformstate |
+| Component | State | Location | IP | Spec |
+|-----------|-------|----------|----|------|
+| Nginx edge + SSL | shared | DO NYC1 | 192.241.155.248 | s-1vcpu-1gb |
+| WireGuard server | shared | DO droplet | 10.99.0.1 | :51820/UDP |
+| VPN gateway VM | shared | Proxmox hyper101 | 192.168.0.106 | 1c/1GB/32GB |
+| web-CV VM | project-cv | Proxmox hyper101 | 192.168.0.105 | 2c/2GB/32GB |
+| SSL cert | shared | DO droplet | — | Let's Encrypt |
+| Terraform state | — | Azure Storage | — | shared.tfstate + project-cv.tfstate |
 
-## Traffic Flow
+## Reusable Modules
 
 ```
-Visitor → https://laurentcadieux.online
-  → DNS resolves to 192.241.155.248 (DO droplet)
-  → Nginx terminates SSL (Let's Encrypt)
-  → proxy_pass http://192.168.0.105:80 (over WireGuard tunnel)
-  → VPN gateway VM (10.99.0.2) routes to vmbr0
-  → web-CV VM Nginx serves React/Vite build
-  → Response flows back through tunnel to visitor
+modules/
+├── digitalocean-edge/   # Nginx + WireGuard + firewall + SSL-ready
+└── proxmox-vm/         # Generic Proxmox VM — used by all projects
 ```
+
+The `proxmox-vm` module is designed for reuse across all projects. It accepts:
+- `name`, `memory`, `cores`, `disk_size` — VM specs
+- `static_ip`, `gateway` — network config (or DHCP if empty)
+- `ssh_keys`, `tags`, `description` — metadata
 
 ## Prerequisites
 
-### 1. SSH Key Pair
+### SSH Key Pair
 ```bash
 ls keys/
 # hybrid-infra-admin      (private — gitignored)
 # hybrid-infra-admin.pub  (public — in dev.tfvars)
 ```
 
-### 2. Credentials (all in `.env`, gitignored)
+### Credentials (in `.env`, gitignored)
 - `DO_TOKEN` — DigitalOcean Personal Access Token
-- `PM_API_TOKEN` — Proxmox API token (`root@pam!terraform=secret`)
+- `PM_API_TOKEN` — Proxmox API token
 - `PM_ENDPOINT` — Proxmox API URL
 - `ARM_*` — Azure Service Principal for state backend
 
-### 3. Secrets (in `environments/dev/secrets.tfvars`, gitignored)
+### Secrets (in `environments/shared/secrets.tfvars`, gitignored)
 - WireGuard private/public keys (DO + Proxmox sides)
 - WireGuard preshared key
 
-### 4. Proxmox Template
+### Proxmox Template
 - VM ID 104: Ubuntu 24.04 with cloud-init
-- Snippets content type enabled on `local` storage
-
-## Usage
-
-```bash
-# Load credentials
-set -a && source .env && set +a
-
-# Initialize
-terraform init
-
-# Plan (uses 3 tfvars files: config + secrets + credentials)
-terraform plan \
-  -var-file="environments/dev/dev.tfvars" \
-  -var-file="environments/dev/secrets.tfvars" \
-  -var-file="environments/dev/credentials.tfvars"
-
-# Apply
-terraform apply \
-  -var-file="environments/dev/dev.tfvars" \
-  -var-file="environments/dev/secrets.tfvars" \
-  -var-file="environments/dev/credentials.tfvars"
-
-# Destroy (tears down everything)
-terraform destroy \
-  -var-file="environments/dev/dev.tfvars" \
-  -var-file="environments/dev/secrets.tfvars" \
-  -var-file="environments/dev/credentials.tfvars"
-```
-
-## Post-Apply Manual Steps
-
-After `terraform apply`, the following are configured manually (not yet automated):
-
-1. **WireGuard on VPN VM** — install and configure (see `modules/proxmox-vpn-gw/`)
-2. **WireGuard on DO droplet** — start the service (`systemctl start wg-quick@wg0`)
-3. **Website on web-CV VM** — install Nginx, Node.js, Java, clone repo, build
-4. **SSL certificate** — run certbot on DO droplet
-5. **Nginx proxy config** — point to web-CV VM IP through VPN
-
-## File Structure
-
-```
-My_Hybrid_infra/
-├── main.tf                          # Providers + Azure backend
-├── modules.tf                       # Module wiring (DO edge + VPN VM + web-CV VM)
-├── variables.tf                     # All input variables
-├── outputs.tf                       # Outputs (IPs, VM IDs)
-├── architecture-diagram.html        # Visual architecture diagram
-├── environments/dev/
-│   ├── dev.tfvars                   # Dev config (committed — no secrets)
-│   ├── secrets.tfvars               # WireGuard keys (gitignored)
-│   └── credentials.tfvars           # API tokens (gitignored)
-├── modules/
-│   ├── digitalocean-edge/           # Nginx + WireGuard + firewall + SSL-ready
-│   ├── proxmox-vpn-gw/             # VPN gateway VM (WireGuard client)
-│   └── proxmox-web-cv/             # Web server VM (Nginx + site)
-├── keys/                            # SSH keys (gitignored)
-├── .env                             # Credentials (gitignored)
-├── .gitignore
-└── README.md
-```
 
 ## Security
 
-### What's Protected
+### Protected
 - ✅ No secrets in git (`.env`, `secrets.tfvars`, `credentials.tfvars`, `keys/` all gitignored)
-- ✅ Proxmox not exposed to internet (private network, outbound only)
-- ✅ WireGuard encrypted tunnel (preshared key + Curve25519)
+- ✅ Proxmox not exposed to internet (private, outbound only)
+- ✅ WireGuard encrypted tunnel
 - ✅ SSL/TLS via Let's Encrypt (auto-renewing)
 - ✅ HTTP → HTTPS redirect
+- ✅ Separate states per project (blast radius containment)
 - ✅ Terraform state in Azure with locking
-- ✅ DO firewall: only ports 80, 443, 22, 51820/UDP inbound
 
 ### Known Issues (TODO)
 - ⚠️ SSH port 22 open to world on DO droplet — restrict to known IPs
-- ⚠️ PasswordAuthentication enabled on web-CV VM — disable, key-only
+- ⚠️ PasswordAuthentication enabled on VMs — disable, key-only
 - ⚠️ No UFW on Proxmox VMs — enable and restrict
 - ⚠️ No security headers in Nginx (HSTS, X-Frame-Options, etc.)
 - ⚠️ Java voice gateway not started on web-CV VM
 - ⚠️ Credentials were shared in chat history — rotate all secrets
 
-### Recommended Hardening
-1. Restrict SSH to known source IPs
-2. Disable password auth on all VMs (`PasswordAuthentication no`)
-3. Enable UFW on Proxmox VMs (allow only 80/22 from VPN VM/local)
-4. Add Nginx security headers
-5. Rotate all exposed credentials (DO token, Proxmox token, Azure SP, WireGuard keys)
-6. Set up log monitoring / fail2ban on DO droplet
+## Future Phases
 
-## Multi-Site Expansion
-
-The Nginx edge can host multiple sites. To add a new site:
-
-1. Create a new Proxmox VM (add a module in `modules.tf`)
-2. Add a new Nginx server block on the DO droplet
-3. Point the new domain's DNS to `192.241.155.248`
-4. Run certbot for the new domain
-
-Each site proxies through the same WireGuard tunnel to its respective Proxmox VM.
+- **Phase 2**: Data-driven multi-site Nginx config (add site = one variable entry)
+- **Phase 3**: Ansible playbooks for post-Terraform provisioning
+- **Phase 4**: CI/CD pipeline with GitHub Actions (plan on PR, apply on merge)
+- **Phase 5**: Monitoring (Uptime Kuma, log aggregation)
