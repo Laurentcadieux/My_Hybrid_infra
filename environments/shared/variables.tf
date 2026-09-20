@@ -132,22 +132,3 @@ variable "pm_vpn_gw_gateway" {
   type    = string
   default = "192.168.0.1"
 }
-
-###################
-# Sites (for Nginx proxy config)
-###################
-
-variable "site_domain" {
-  type    = string
-  default = "laurentcadieux.online"
-}
-
-variable "backend_host" {
-  type    = string
-  default = "192.168.0.105"
-}
-
-variable "backend_port" {
-  type    = number
-  default = 80
-}

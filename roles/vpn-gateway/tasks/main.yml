@@ -1,0 +1,49 @@
+---
+- name: Install WireGuard
+  ansible.builtin.apt:
+    name: [wireguard, wireguard-tools]
+    state: present
+    update_cache: yes
+
+- name: Write WireGuard config
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+  notify: restart wireguard
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: yes
+
+- name: Allow forwarding in UFW
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: wg0
+
+- name: Add iptables NAT rules
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    out_interface: eth0
+    jump: MASQUERADE
+
+- name: Add iptables forward rules
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: wg0
+    out_interface: eth0
+    jump: ACCEPT
+
+- name: Save iptables rules
+  ansible.builtin.shell: netfilter-persistent save
+
+- name: Enable WireGuard
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: started
+    enabled: yes

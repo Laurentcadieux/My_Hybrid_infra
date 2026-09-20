@@ -46,3 +46,8 @@ azure-*
 # OS
 .DS_Store
 Thumbs.db
+
+# Ansible vault
+group_vars/vault.yml
+*vault*.yml
+*vault*.yaml

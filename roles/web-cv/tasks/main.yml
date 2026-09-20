@@ -1,0 +1,58 @@
+---
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: [nginx, git, curl]
+    state: present
+    update_cache: yes
+
+- name: Install Node.js 20
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+
+- name: Install Java 17
+  ansible.builtin.apt:
+    name: openjdk-17-jre-headless
+    state: present
+
+- name: Clone website repo
+  ansible.builtin.git:
+    repo: "{{ site_repo }}"
+    dest: "/var/www/{{ site_domain }}"
+    force: yes
+  become: yes
+
+- name: Install npm dependencies
+  ansible.builtin.shell: "cd /var/www/{{ site_domain }} && npm install"
+  become: yes
+
+- name: Build site
+  ansible.builtin.shell: "cd /var/www/{{ site_domain }} && npm run build"
+  become: yes
+
+- name: Write Nginx config
+  ansible.builtin.template:
+    src: web-cv.conf.j2
+    dest: "/etc/nginx/sites-available/{{ site_domain }}.conf"
+  notify: restart nginx
+
+- name: Enable site
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ site_domain }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ site_domain }}.conf"
+    state: link
+  notify: restart nginx
+
+- name: Remove default site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Allow HTTP in UFW
+  community.general.ufw:
+    rule: allow
+    port: 80
+    proto: tcp

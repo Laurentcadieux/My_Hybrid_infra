@@ -1,0 +1,25 @@
+---
+# Get/renew SSL certificates on the DO edge
+# Usage: ansible-playbook playbooks/ssl.yml -i inventory/hosts.yml
+
+- name: Issue SSL certificates
+  hosts: nginx
+  become: yes
+  tasks:
+    - name: Get SSL cert for laurentcadieux.online
+      ansible.builtin.shell: |
+        certbot certonly --nginx \
+          -d laurentcadieux.online \
+          -d www.laurentcadieux.online \
+          --non-interactive \
+          --agree-tos \
+          --email admin@laurentcadieux.online
+      register: cert_result
+      changed_when: "'Successfully received certificate' in cert_result.stdout"
+
+    - name: Set up auto-renew
+      ansible.builtin.cron:
+        name: "certbot renew"
+        job: "certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
+        hour: "0"
+        minute: "0"

@@ -6,7 +6,6 @@ module "do_edge" {
   region         = var.region
   size           = var.do_droplet_size
   ssh_public_key = var.ssh_public_key
-  site_domain    = var.site_domain
 
   wg_private_key    = var.do_wg_private_key
   wg_peer_public    = var.pm_wg_public_key
@@ -15,8 +14,22 @@ module "do_edge" {
   peer_vpn_ip       = var.pm_vpn_ip
   vpn_subnet        = var.vpn_subnet
 
-  backend_host = var.backend_host
-  backend_port = var.backend_port
+  # Multi-site config — add new sites here
+  sites = {
+    "cv" = {
+      domain       = "laurentcadieux.online"
+      backend_ip   = "192.168.0.105"
+      backend_port = 80
+      ssl          = true
+    }
+    # Add new sites like this:
+    # "saas-1" = {
+    #   domain       = "app.myother.com"
+    #   backend_ip   = "192.168.0.107"
+    #   backend_port = 3000
+    #   ssl          = true
+    # }
+  }
 
   tags = [var.project_name, var.environment, "dmz", "nginx"]
 }
@@ -33,9 +46,9 @@ module "vpn_gw" {
   cores       = var.pm_vpn_gw_cores
   disk_size   = var.pm_vpn_gw_disk
   ssh_keys    = [var.ssh_public_key]
-  static_ip  = var.pm_vpn_gw_static_ip
-  gateway    = var.pm_vpn_gw_gateway
-  tags       = ["hybrid-infra", "vpn-gw"]
+  static_ip   = var.pm_vpn_gw_static_ip
+  gateway     = var.pm_vpn_gw_gateway
+  tags        = ["hybrid-infra", "vpn-gw"]
   description = "WireGuard VPN gateway — routes DO traffic to internal VMs"
 }
 

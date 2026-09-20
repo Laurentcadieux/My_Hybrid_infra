@@ -1,0 +1,12 @@
+---
+# Deploy or update the website (without touching infrastructure)
+# Usage: ansible-playbook playbooks/deploy-site.yml -i inventory/hosts.yml
+
+- name: Deploy website to web-CV
+  hosts: web_cv
+  become: yes
+  roles:
+    - web-cv
+  vars:
+    site_repo: "https://github.com/Laurentcadieux/LaurentCadieuxDOTonline.git"
+    site_domain: "laurentcadieux.online"

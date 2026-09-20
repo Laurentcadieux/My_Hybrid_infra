@@ -10,166 +10,174 @@ Internet → DO Nginx (SSL :443) → WireGuard → Proxmox VPN VM → vmbr0 → 
 
 ```
                     ┌─────────────────────────────────────────────┐
-                    │            DigitalOcean (NYC1)               │
-   Internet ──────▶ │   Nginx DMZ (s-1vcpu-1gb, Debian 13)        │
-   DNS → DO IP      │   SSL: Let's Encrypt • WireGuard server     │
-   :443 (SSL)       │   192.241.155.248 (public)                   │
+   Internet ──────▶ │   DigitalOcean NYC1                         │
+   DNS → DO IP      │   Nginx DMZ (s-1vcpu-1gb) + WireGuard server  │
+   :443 SSL         │   192.241.155.248                            │
    :80 → 301 HTTPS  └──────────────┬──────────────────────────────┘
-                                   │ WireGuard VPN (10.99.0.0/24)
-                                   │ DO listens, Proxmox connects outbound
+                                   │ WireGuard (10.99.0.0/24, outbound)
                     ┌──────────────┼──────────────────────────────┐
-                    │  Proxmox VE — hyper101 (Private)           │
-                    │  ┌───────────┴──────────┐                   │
-                    │  │  VPN Gateway VM (106) │                   │
-                    │  │  WireGuard client     │                   │
-                    │  │  10.99.0.2 → vmbr0    │                   │
-                    │  └───────────┬──────────┘                   │
-                    │  ┌───────────┴──────────┐                   │
-                    │  │  web-CV VM (105)      │                   │
-                    │  │  Nginx + React/Vite   │                   │
-                    │  │  192.168.0.105        │                   │
-                    │  └──────────────────────┘                   │
+                    │  Proxmox hyper101 (Private, Outbound Only) │
+                    │  ┌───────────┴──────────┐                    │
+                    │  │  VPN Gateway VM (106) │                    │
+                    │  │  WireGuard client     │                    │
+                    │  └───────────┬──────────┘                    │
+                    │  ┌───────────┴──────────┐                    │
+                    │  │  web-CV VM (105)      │                    │
+                    │  │  Nginx + React/Vite   │                    │
+                    │  └──────────────────────┘                    │
                     └─────────────────────────────────────────────┘
 ```
 
-## Multi-State Architecture
+## Multi-State Terraform + Ansible
 
-The infrastructure is split into **independent Terraform states** so projects can be added/removed without affecting each other:
+Infrastructure is split into independent layers:
+
+| Layer | State File | What it manages | When to change |
+|-------|-----------|-----------------|----------------|
+| Shared | `shared.tfstate` | DO edge + VPN gateway | Adding new sites to Nginx, changing VPN |
+| Project | `project-cv.tfstate` | web-CV VM | Changing VM specs, adding projects |
+| Ansible | — | Software on VMs | Deploying apps, updates, hardening |
+
+**Terraform** creates infrastructure (VMs, droplets, firewalls).
+**Ansible** configures software (Nginx, WireGuard, apps, security).
+
+### Repo Structure
 
 ```
-environments/
-├── shared/          # DO edge + VPN gateway — always on, shared by all projects
-│   ├── main.tf             # Providers + Azure backend (shared.tfstate)
-│   ├── main-modules.tf     # DO edge + VPN gateway modules
-│   ├── variables.tf
-│   ├── dev.tfvars           # Config (committed, no secrets)
-│   ├── secrets.tfvars       # WireGuard keys (gitignored)
-│   └── credentials.tfvars   # API tokens (gitignored)
-│
-└── project-cv/      # laurentcadieux.online — one project
-    ├── main.tf             # Providers + Azure backend (project-cv.tfstate)
-    ├── main-modules.tf     # web-CV VM module
-    ├── variables.tf
-    ├── dev.tfvars           # Config (committed, no secrets)
-    └── credentials.tfvars   # API tokens (gitignored)
+My_Hybrid_infra/
+├── environments/
+│   ├── shared/              # DO edge + VPN gateway (always on)
+│   │   ├── main.tf          # Providers + backend (shared.tfstate)
+│   │   ├── main-modules.tf  # DO edge + VPN VM modules
+│   │   ├── variables.tf
+│   │   ├── dev.tfvars        # Config (committed)
+│   │   ├── secrets.tfvars    # WireGuard keys (gitignored)
+│   │   └── credentials.tfvars # API tokens (gitignored)
+│   └── project-cv/          # laurentcadieux.online
+│       ├── main.tf          # Providers + backend (project-cv.tfstate)
+│       ├── main-modules.tf  # web-CV VM module
+│       ├── variables.tf
+│       ├── dev.tfvars
+│       └── credentials.tfvars
+├── modules/
+│   ├── digitalocean-edge/   # Nginx + WireGuard + firewall (multi-site)
+│   └── proxmox-vm/          # Generic reusable VM module
+├── playbooks/
+│   ├── site.yml             # Full provision (harden + VPN + web + SSL)
+│   ├── deploy-site.yml      # Deploy/update website only
+│   ├── harden.yml           # Security hardening only
+│   └── ssl.yml              # Get/renew SSL certificates
+├── roles/
+│   ├── common/              # SSH hardening, UFW, fail2ban
+│   ├── vpn-gateway/         # WireGuard client + routing
+│   └── web-cv/             # Nginx + Node.js + Java + site deploy
+├── inventory/
+│   ├── hosts.yml            # Host inventory
+│   └── group_vars/all.yml   # Shared Ansible vars
+├── ansible.cfg
+├── architecture-diagram.html
+├── keys/                    # SSH keys (gitignored)
+├── .env                     # Credentials (gitignored)
+└── .env.example
 ```
-
-### Adding a New Project
-
-```bash
-# 1. Create a new environment directory
-mkdir -p environments/project-saas-1
-
-# 2. Copy the project-cv structure and adapt
-cp environments/project-cv/main.tf environments/project-saas-1/
-cp environments/project-cv/credentials.tfvars environments/project-saas-1/
-
-# 3. Edit main.tf: change the backend key to "project-saas-1.tfstate"
-# 4. Edit main-modules.tf: change VM name, IP, specs
-# 5. Create dev.tfvars with the new VM config
-
-# 6. Initialize and apply the new project
-cd environments/project-saas-1
-terraform init
-terraform apply -var-file=dev.tfvars -var-file=credentials.tfvars
-
-# 7. Add the new site to the shared Nginx config:
-#    Edit environments/shared/dev.tfvars → update backend_host
-#    Or add a new server block to the DO droplet's Nginx
-cd ../shared
-terraform apply -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
-```
-
-Each project has its own state — destroying project-saas-1 won't touch the CV site or the shared edge.
 
 ## Usage
 
-### Shared Infrastructure (DO edge + VPN gateway)
+### 1. Terraform — Create Infrastructure
+
 ```bash
+# Shared (DO edge + VPN gateway)
 cd environments/shared
 set -a && source ../../.env && set +a
 terraform init
-terraform plan -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
 terraform apply -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
-```
 
-### Project: CV (web-CV VM)
-```bash
-cd environments/project-cv
-set -a && source ../../.env && set +a
-terraform init
-terraform plan -var-file=dev.tfvars -var-file=credentials.tfvars
+# Project CV (web-CV VM)
+cd ../project-cv
 terraform apply -var-file=dev.tfvars -var-file=credentials.tfvars
 ```
 
-## Components
+### 2. Ansible — Configure Software
 
-| Component | State | Location | IP | Spec |
-|-----------|-------|----------|----|------|
-| Nginx edge + SSL | shared | DO NYC1 | 192.241.155.248 | s-1vcpu-1gb |
-| WireGuard server | shared | DO droplet | 10.99.0.1 | :51820/UDP |
-| VPN gateway VM | shared | Proxmox hyper101 | 192.168.0.106 | 1c/1GB/32GB |
-| web-CV VM | project-cv | Proxmox hyper101 | 192.168.0.105 | 2c/2GB/32GB |
-| SSL cert | shared | DO droplet | — | Let's Encrypt |
-| Terraform state | — | Azure Storage | — | shared.tfstate + project-cv.tfstate |
-
-## Reusable Modules
-
-```
-modules/
-├── digitalocean-edge/   # Nginx + WireGuard + firewall + SSL-ready
-└── proxmox-vm/         # Generic Proxmox VM — used by all projects
-```
-
-The `proxmox-vm` module is designed for reuse across all projects. It accepts:
-- `name`, `memory`, `cores`, `disk_size` — VM specs
-- `static_ip`, `gateway` — network config (or DHCP if empty)
-- `ssh_keys`, `tags`, `description` — metadata
-
-## Prerequisites
-
-### SSH Key Pair
 ```bash
-ls keys/
-# hybrid-infra-admin      (private — gitignored)
-# hybrid-infra-admin.pub  (public — in dev.tfvars)
+# Full provisioning (harden all + VPN + web + SSL)
+ansible-playbook playbooks/site.yml -i inventory/hosts.yml
+
+# Or individual tasks:
+ansible-playbook playbooks/harden.yml      # Security hardening
+ansible-playbook playbooks/deploy-site.yml  # Deploy/update website
+ansible-playbook playbooks/ssl.yml          # SSL certificates
 ```
 
-### Credentials (in `.env`, gitignored)
-- `DO_TOKEN` — DigitalOcean Personal Access Token
-- `PM_API_TOKEN` — Proxmox API token
-- `PM_ENDPOINT` — Proxmox API URL
-- `ARM_*` — Azure Service Principal for state backend
+### 3. Adding a New Project
 
-### Secrets (in `environments/shared/secrets.tfvars`, gitignored)
-- WireGuard private/public keys (DO + Proxmox sides)
-- WireGuard preshared key
+```bash
+# 1. Create new environment
+cp -r environments/project-cv environments/project-saas-1
+# Edit: change backend key to "project-saas-1.tfstate", update VM name/IP
 
-### Proxmox Template
-- VM ID 104: Ubuntu 24.04 with cloud-init
+# 2. Create the VM
+cd environments/project-saas-1
+terraform init && terraform apply -var-file=dev.tfvars -var-file=credentials.tfvars
+
+# 3. Add site to shared Nginx (one entry in the sites map)
+cd ../shared
+# Edit main-modules.tf → add entry to the "sites" map:
+#   "saas-1" = { domain = "app.myother.com", backend_ip = "192.168.0.107", backend_port = 3000, ssl = true }
+terraform apply -var-file=dev.tfvars -var-file=secrets.tfvars -var-file=credentials.tfvars
+
+# 4. Point DNS to 192.241.155.248
+# 5. Run certbot for the new domain
+ansible-playbook playbooks/ssl.yml -i inventory/hosts.yml -e domains=app.myother.com
+
+# 6. Deploy the app via Ansible (create a role for it)
+```
+
+## Multi-Site Nginx
+
+The DO edge module uses a data-driven `sites` map. Adding a site is one entry:
+
+```hcl
+sites = {
+  "cv" = {
+    domain       = "laurentcadieux.online"
+    backend_ip   = "192.168.0.105"
+    backend_port = 80
+    ssl          = true
+  }
+  # New site:
+  "saas-1" = {
+    domain       = "app.myother.com"
+    backend_ip   = "192.168.0.107"
+    backend_port = 3000
+    ssl          = true
+  }
+}
+```
+
+Nginx config and security headers are generated automatically. No manual Nginx editing.
 
 ## Security
 
 ### Protected
-- ✅ No secrets in git (`.env`, `secrets.tfvars`, `credentials.tfvars`, `keys/` all gitignored)
+- ✅ No secrets in git (`.env`, `secrets.tfvars`, `credentials.tfvars`, `keys/`, vault all gitignored)
 - ✅ Proxmox not exposed to internet (private, outbound only)
 - ✅ WireGuard encrypted tunnel
 - ✅ SSL/TLS via Let's Encrypt (auto-renewing)
-- ✅ HTTP → HTTPS redirect
+- ✅ HTTP → HTTPS redirect + security headers (HSTS, X-Frame-Options, etc.)
 - ✅ Separate states per project (blast radius containment)
+- ✅ Ansible hardening role (SSH key-only, UFW, fail2ban)
 - ✅ Terraform state in Azure with locking
 
-### Known Issues (TODO)
-- ⚠️ SSH port 22 open to world on DO droplet — restrict to known IPs
-- ⚠️ PasswordAuthentication enabled on VMs — disable, key-only
-- ⚠️ No UFW on Proxmox VMs — enable and restrict
-- ⚠️ No security headers in Nginx (HSTS, X-Frame-Options, etc.)
-- ⚠️ Java voice gateway not started on web-CV VM
-- ⚠️ Credentials were shared in chat history — rotate all secrets
+### Ansible Security Roles
+- **common** — disables password SSH, disables root login, enables UFW + fail2ban
+- **vpn-gateway** — WireGuard config, IP forwarding, NAT rules
+- **web-cv** — Nginx, Node.js, Java, site deployment
 
-## Future Phases
+## Prerequisites
 
-- **Phase 2**: Data-driven multi-site Nginx config (add site = one variable entry)
-- **Phase 3**: Ansible playbooks for post-Terraform provisioning
-- **Phase 4**: CI/CD pipeline with GitHub Actions (plan on PR, apply on merge)
-- **Phase 5**: Monitoring (Uptime Kuma, log aggregation)
+- Terraform >= 1.7.0
+- Ansible (for post-Terraform provisioning)
+- SSH key pair in `keys/`
+- `.env` with DO token, Proxmox token, Azure SP credentials
+- Proxmox template (VM 104: Ubuntu 24.04 with cloud-init)

@@ -1,0 +1,10 @@
+[Interface]
+PrivateKey = {{ wg_private_key }}
+Address = {{ vpn_ip }}/24
+
+[Peer]
+PublicKey = {{ do_public_key }}
+PresharedKey = {{ vpn_preshared_key }}
+Endpoint = {{ do_endpoint }}:51820
+AllowedIPs = {{ vpn_subnet }}
+PersistentKeepalive = 25

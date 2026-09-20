@@ -1,0 +1,9 @@
+---
+# Apply security hardening only
+# Usage: ansible-playbook playbooks/harden.yml -i inventory/hosts.yml
+
+- name: Apply common hardening to all hosts
+  hosts: all
+  become: yes
+  roles:
+    - common
